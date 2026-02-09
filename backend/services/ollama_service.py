@@ -1,0 +1,157 @@
+import base64
+from typing import Any
+
+import httpx
+
+try:
+    from backend.config import (
+        MODEL_NAME,
+        OLLAMA_API_URL,
+        OLLAMA_IMAGE_API_URL,
+        OLLAMA_TIMEOUT_SECONDS,
+    )
+except ModuleNotFoundError:
+    # Fallback import for local running
+    from config import (
+        MODEL_NAME,
+        OLLAMA_API_URL,
+        OLLAMA_IMAGE_API_URL,
+        OLLAMA_TIMEOUT_SECONDS,
+    )
+
+
+class OllamaError(Exception):
+    pass
+
+
+def _extract_base64(payload: Any) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+
+    # 1. Cek field 'image' atau 'images' (Prioritas utama untuk model gambar)
+    if isinstance(payload.get("image"), str) and payload["image"]:
+        return payload["image"]
+
+    images = payload.get("images")
+    if isinstance(images, list) and images:
+        if isinstance(images[0], str) and images[0]:
+            return images[0]
+
+    # 2. Cek data OpenAI style
+    data = payload.get("data")
+    if isinstance(data, list) and data:
+        first = data[0]
+        if isinstance(first, dict):
+            for key in ["b64_json", "b64", "image"]:
+                val = first.get(key)
+                if isinstance(val, str) and val:
+                    return val
+
+    # 3. Fallback ke 'response' (Biasanya untuk model teks, atau model image lama)
+    if isinstance(payload.get("response"), str) and payload["response"]:
+        return payload["response"]
+
+    return None
+
+
+async def generate_image_bytes(prompt: str, model: str | None = None) -> bytes:
+    target_model = model or MODEL_NAME
+    
+    # Payload standar untuk endpoint /api/generate (universal)
+    payload = {
+        "model": target_model,
+        "prompt": prompt,
+        "stream": False,
+        # "format": "json", # Jangan force JSON, biar text model bisa ngomong bebas
+    }
+    
+    # Jika modelnya known image generator, mungkin perlu options beda?
+    # Untuk simplifikasi, kita pakai endpoint /api/generate standar.
+
+    try:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT_SECONDS) as client:
+            response = await client.post(OLLAMA_API_URL, json=payload)
+            response.raise_for_status()
+            
+    except httpx.TimeoutException as exc:
+        raise OllamaError("Ollama request timed out") from exc
+    except httpx.ConnectError as exc:
+        raise OllamaError(f"Could not connect to Ollama at {OLLAMA_API_URL}. Is it running and accessible?") from exc
+    except httpx.HTTPError as exc:
+        response = getattr(exc, "response", None)
+        status = getattr(response, "status_code", None) if response else None
+        body = getattr(response, "text", "") if response else ""
+        detail = "Ollama request failed"
+        if status:
+            detail += f" (status {status})"
+        if body:
+            detail += f": {body[:200]}"
+        raise OllamaError(detail) from exc
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise OllamaError("Invalid JSON from Ollama") from exc
+
+    content = _extract_base64(data)
+    if not content:
+        # Debug logging to see what Ollama actually returned
+        import json
+        print(f"DEBUG: Ollama response keys: {list(data.keys())}")
+        if "response" in data:
+            print(f"DEBUG: 'response' length: {len(str(data['response']))}")
+        raise OllamaError(f"Ollama response missing data. Keys: {list(data.keys())}")
+
+    # Deteksi apakah ini Base64 (Gambar) atau Plain Text
+    try:
+        cleaned = content.strip()
+        if cleaned.startswith("data:") and "base64," in cleaned:
+            cleaned = cleaned.split("base64,", 1)[1]
+        return base64.b64decode(cleaned)
+    except Exception:
+        # Jika gagal decode, asumsikan itu teks, lalu convert ke image sebagai fallback debug
+        return _text_to_image_bytes(content)
+
+def _text_to_image_bytes(text: str) -> bytes:
+    """Helper: Convert text response into an image (for debug/text models)."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import io
+        import textwrap
+
+        # Create a black image
+        W, H = 800, 600
+        img = Image.new('RGB', (W, H), color=(20, 20, 20))
+        d = ImageDraw.Draw(img)
+        
+        # Load default font (or try to load system font)
+        # Fallback to default if load fails
+        try:
+            # Try arial/dejavu/verdan
+            font = ImageFont.truetype("arial.ttf", 20)
+        except OSError:
+            font = ImageFont.load_default()
+
+        # Wrap text
+        margin = 40
+        offset = 40
+        lines = textwrap.wrap(text, width=70) # Adjust width based on font size
+
+        # Draw Title
+        d.text((margin, 10), "AI TEXT RESPONSE (DEBUG MODE):", fill=(0, 255, 255), font=font)
+
+        for line in lines:
+            d.text((margin, offset), line, fill=(255, 255, 255), font=font)
+            offset += 30 # Line height
+        
+        # Add footer
+        d.text((margin, H-30), "Generated by Mapic Fallback Engine", fill=(100, 100, 100), font=font)
+
+        # Save to bytes
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        return buf.getvalue()
+
+    except ImportError:
+        # Fallback if PIL missing
+        return base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=")
