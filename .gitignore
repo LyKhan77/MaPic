@@ -24,3 +24,8 @@ temp/
 *.md
 !README.md
 .gemini/
+
+# Test files
+test_*.py
+*_test.py
+tests/
