@@ -1,4 +1,4 @@
-import { LogOut, Plus, User, Trash2, Sun, Moon, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react'
+import { LogOut, Plus, Trash2, ChevronLeft, ChevronRight, MessageSquare } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { Generation } from '../types'
 import { cn } from '../lib/utils'

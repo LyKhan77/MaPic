@@ -1,6 +1,8 @@
 # MaPic - GenAI Image Studio
 
-MaPic is a modern, self-hosted AI Image Generation Studio that allows users to create high-quality images using custom AI models (powered by Ollama). It features a sleek, futuristic UI with Light/Dark mode support, a responsive design, and a robust history management system.
+**Developed by Lee Khan** | *Synthesizing the Future*
+
+MaPic is a cutting-edge AI Image Studio designed to bridge the gap between human intent and neural rendering. Powered by local inference engines (Ollama), it enables the effortless materialization of digital artifacts. With a futuristic "Glassmorphism" interface, adaptive themes, and intelligent history tracking, MaPic is your portal to the Generative Age.
 
 ## 🚀 Features
 
@@ -64,7 +66,11 @@ CORS_ORIGINS="http://localhost:5173"
 
 Run the backend:
 ```bash
+# Standard local development
 fastapi dev main.py
+
+# OR run with Uvicorn (accessible from other devices)
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### 3. Frontend Setup
@@ -92,6 +98,7 @@ npm run dev
 4.  View your creation in the main canvas.
 5.  Use the **Sidebar** to access previous generations or switch themes.
 
-## 📝 License
+## ⚡ Creator
 
-This project is licensed under the MIT License.
+Developed with vision by **Lee Khan**.
+*The code is the canvas.*
