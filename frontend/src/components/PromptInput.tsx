@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent, useRef, useEffect } from 'react'
-import { Send, Settings2, Paperclip, X } from 'lucide-react'
+import { Send, Settings2, Paperclip, X, ChevronDown } from 'lucide-react'
 
 interface PromptInputProps {
   onGenerate: (prompt: string, model: string, images?: string[]) => void
@@ -19,6 +19,7 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
   const [prompt, setPrompt] = useState('')
   const [selectedModel, setSelectedModel] = useState(MODELS[0].id)
   const [showSettings, setShowSettings] = useState(false)
+  const [showReferences, setShowReferences] = useState(true)
   const [images, setImages] = useState<{ id: string; base64: string }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -150,23 +151,6 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
           </div>
         )}
 
-        {/* Thumbnails Preview */}
-        {images.length > 0 && (
-          <div className={`flex gap-2 px-2 ${isCentralized ? 'justify-center' : ''}`}>
-            {images.map(img => (
-              <div key={img.id} className="relative w-16 h-16 rounded-md overflow-hidden border border-border group bg-black/20">
-                <img src={img.base64} alt="Reference" className="w-full h-full object-cover" />
-                <button
-                  onClick={() => removeImage(img.id)}
-                  className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         <div className={`relative flex items-center gap-2 transition-all ${isCentralized ? 'rounded-full bg-[#2a2a2a] p-1.5 shadow-xl ring-1 ring-white/5' : 'rounded-xl bg-muted/20 p-2 ring-1 ring-border focus-within:ring-primary/50'}`}>
           <input 
              type="file" 
@@ -209,6 +193,38 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
             )}
           </button>
         </div>
+
+        {/* Reference Images Dropdown */}
+        {images.length > 0 && (
+          <div className="mt-2 border border-border rounded-lg bg-card/40 overflow-hidden animate-in fade-in slide-in-from-top-2">
+            <button
+              onClick={() => setShowReferences(!showReferences)}
+              className="w-full flex items-center justify-between p-2.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+            >
+              <div className="flex items-center gap-2 font-mono">
+                <Paperclip size={14} />
+                <span>{images.length} Reference Image{images.length > 1 ? 's' : ''} attached</span>
+              </div>
+              <ChevronDown size={16} className={`transition-transform duration-200 ${showReferences ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {showReferences && (
+              <div className={`p-3 flex gap-3 flex-wrap border-t border-border bg-black/10 ${isCentralized ? 'justify-center' : ''}`}>
+                {images.map(img => (
+                  <div key={img.id} className="relative w-16 h-16 rounded-md overflow-hidden border border-border group bg-black/40 shadow-sm">
+                    <img src={img.base64} alt="Reference" className="w-full h-full object-cover" />
+                    <button
+                      onClick={() => removeImage(img.id)}
+                      className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         
         {isCentralized && (
             <div className="flex justify-center gap-4 mt-4">
