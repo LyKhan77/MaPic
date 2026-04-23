@@ -54,7 +54,7 @@ def _extract_base64(payload: Any) -> str | None:
     return None
 
 
-async def generate_image_bytes(prompt: str, model: str | None = None) -> bytes:
+async def generate_image_bytes(prompt: str, model: str | None = None, images: list[str] | None = None) -> bytes:
     target_model = model or MODEL_NAME
     
     # Payload standar untuk endpoint /api/generate (universal)
@@ -64,6 +64,9 @@ async def generate_image_bytes(prompt: str, model: str | None = None) -> bytes:
         "stream": False,
         # "format": "json", # Jangan force JSON, biar text model bisa ngomong bebas
     }
+    
+    if images:
+        payload["images"] = images
     
     # Jika modelnya known image generator, mungkin perlu options beda?
     # Untuk simplifikasi, kita pakai endpoint /api/generate standar.

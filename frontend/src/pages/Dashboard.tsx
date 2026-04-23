@@ -24,7 +24,7 @@ export default function Dashboard({ session }: DashboardProps) {
 
   // Generate Mutation
   const generateMutation = useMutation({
-    mutationFn: ({ prompt, model }: { prompt: string; model: string }) => api.generateImage(prompt, session.user.id, model),
+    mutationFn: ({ prompt, model, images }: { prompt: string; model: string; images?: string[] }) => api.generateImage(prompt, session.user.id, model, images),
     onMutate: () => {
       setCurrentGen(null) // Clear current image to show loading state
     },
@@ -79,21 +79,25 @@ export default function Dashboard({ session }: DashboardProps) {
         currentId={currentGen?.id}
       />
       
-      <main className="flex flex-1 flex-col relative">
-        <div className="flex-1 relative">
+      <main className="flex flex-1 flex-col relative min-w-0 min-h-0">
+        <div className="flex-1 relative min-h-0 flex flex-col">
            <ImageCanvas 
              currentGeneration={currentGen} 
              isLoading={generateMutation.isPending} 
-             onGenerate={(prompt, model) => generateMutation.mutate({ prompt, model })}
+             onGenerate={(prompt, model, images) => generateMutation.mutate({ prompt, model, images })}
            />
         </div>
-        
+
         {currentGen && (
-          <PromptInput 
-            onGenerate={(prompt, model) => generateMutation.mutate({ prompt, model })} 
-            isLoading={generateMutation.isPending} 
-            isCentralized={false}
-          />
+          <div className="shrink-0 w-full bg-background relative z-20">
+            <PromptInput 
+              onGenerate={(prompt, model, images) => generateMutation.mutate({ prompt, model, images })} 
+              isLoading={generateMutation.isPending} 
+              isCentralized={false}
+              initialPrompt={currentGen.prompt}
+              initialImageUrl={currentGen.public_url}
+            />
+          </div>
         )}
       </main>
     </div>

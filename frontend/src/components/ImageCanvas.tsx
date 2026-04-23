@@ -10,7 +10,7 @@ import { useState } from 'react'
 interface ImageCanvasProps {
   currentGeneration: Generation | null
   isLoading: boolean
-  onGenerate: (prompt: string, model: string) => void
+  onGenerate: (prompt: string, model: string, images?: string[]) => void
 }
 
 export default function ImageCanvas({ currentGeneration, isLoading, onGenerate }: ImageCanvasProps) {
@@ -75,12 +75,12 @@ export default function ImageCanvas({ currentGeneration, isLoading, onGenerate }
               initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
               transition={{ duration: 0.5 }}
-              className="group relative max-h-full max-w-full overflow-hidden rounded-lg border border-border bg-card/50 shadow-2xl"
+              className="group relative flex h-full max-h-[70vh] max-w-full items-center justify-center overflow-hidden rounded-lg border border-border bg-card/50 shadow-2xl p-4"
             >
               <img 
                 src={currentGeneration.public_url} 
                 alt={currentGeneration.prompt} 
-                className="max-h-[70vh] w-auto object-contain"
+                className="h-full w-full object-contain"
               />
               
               {/* Overlay Actions */}
