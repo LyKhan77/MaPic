@@ -67,10 +67,7 @@ CORS_ORIGINS="http://localhost:5173"
 Run the backend:
 ```bash
 # Standard local development
-fastapi dev main.py
-
-# OR run with Uvicorn (accessible from other devices)
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+python -m uvicorn main:app --host 0.0.0.0 --port 8181 --reload
 ```
 
 ### 3. Frontend Setup

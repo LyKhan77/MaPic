@@ -35,5 +35,5 @@ OLLAMA_IMAGE_API_URL = _image_api_url
 _env_model = _get_env("MODEL_NAME", _get_env("OLLAMA_MODEL", DEFAULT_MODEL))
 MODEL_NAME = _env_model
 
-CORS_ORIGINS = _get_env("CORS_ORIGINS", "http://localhost:5173")
+CORS_ORIGINS = _get_env("CORS_ORIGINS", "http://localhost:5151")
 OLLAMA_TIMEOUT_SECONDS = float(_get_env("OLLAMA_TIMEOUT", "120"))

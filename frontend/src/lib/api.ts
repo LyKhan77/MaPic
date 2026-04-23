@@ -1,4 +1,4 @@
-const API_URL = `http://${window.location.hostname}:8000/api`
+const API_URL = `http://${window.location.hostname}:8181/api`
 
 export const api = {
   async getHistory(userId: string) {
