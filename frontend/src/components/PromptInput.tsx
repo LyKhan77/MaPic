@@ -11,8 +11,8 @@ interface PromptInputProps {
 }
 
 const MODELS = [
-  { id: 'x/flux2-klein:4b-fp8', name: 'Flux2 Klein (4B fp8)' },
   { id: 'x/flux2-klein:4b', name: 'Flux2 Klein (4B Original)' },
+  { id: 'x/flux2-klein:4b-fp8', name: 'Flux2 Klein (4B fp8)' },
 ]
 
 export default function PromptInput({ onGenerate, isLoading, isCentralized, onTyping, initialPrompt, initialImageUrl }: PromptInputProps) {

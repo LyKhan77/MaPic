@@ -19,7 +19,7 @@ dist/
 tmp/
 temp/
 *.tmp
-
+*test/
 # Documentation (keep only README.md)
 *.md
 !README.md
