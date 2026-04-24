@@ -2,17 +2,30 @@
 
 **Developed by Lee Khan** | *Synthesizing the Future*
 
-MaPic is a cutting-edge AI Image Studio designed to bridge the gap between human intent and neural rendering. Powered by local inference engines (Ollama), it enables the effortless materialization of digital artifacts. With a futuristic "Glassmorphism" interface, adaptive themes, and intelligent history tracking, MaPic is your portal to the Generative Age.
+MaPic turns text prompts and reference images into production-quality visuals — running entirely on local hardware. Built on **GLM-Image** (9B AR + 7B diffusion decoder), it delivers text-to-image and multi-reference image-to-image generation with no cloud dependencies, no API costs, and no rate limits.
 
 ## 🚀 Features
 
-*   **AI Image Generation:** Generate images using models like `x/z-image-turbo:fp8` (via Ollama).
+*   **AI Image Generation:** Generate images using GLM-Image (local inference via diffusers pipeline).
+*   **Multi-Reference Support:** Attach up to 3 reference images for image-to-image generation (style transfer, editing, identity-preserving).
 *   **Modern UI:** Futuristic "Glassmorphism" design with smooth animations (Framer Motion).
 *   **Theme Support:** Fully supported **Dark** and **Light** modes with a one-click toggle.
 *   **History Management:** Automatically saves generated images and prompts. View, select, and delete history items.
 *   **Responsive Design:** Collapsible sidebar and mobile-friendly layout.
 *   **Secure Auth:** Google OAuth 2.0 via Supabase Authentication.
 *   **Share & Download:** Easily download images or copy direct links to the clipboard.
+
+## 🏗️ Architecture
+
+```
+Frontend (React :5151)
+    ↓
+MaPic Backend (FastAPI :8181)
+    ↓
+GLM-Image Server (FastAPI :30000)
+    ↓
+diffusers GlmImagePipeline (CPU offload, ~23GB VRAM)
+```
 
 ## 🛠️ Tech Stack
 
@@ -26,16 +39,21 @@ MaPic is a cutting-edge AI Image Studio designed to bridge the gap between human
 
 ### Backend
 *   **Framework:** Python FastAPI
-*   **AI Engine:** Custom Ollama Host
+*   **AI Engine:** GLM-Image (local diffusers pipeline)
 *   **Database & Storage:** Supabase (PostgreSQL + Storage Buckets)
+
+### Inference Server
+*   **Framework:** Python FastAPI + Uvicorn
+*   **Model:** GLM-Image (9B AR + 7B Diffusion Decoder)
+*   **Runtime:** PyTorch with CUDA, diffusers, transformers
 
 ## 📦 Installation & Setup
 
 ### Prerequisites
 *   Node.js & npm
 *   Python 3.10+
-*   Supabase Account (Project URL & Anon Key)
-*   Ollama Instance (Custom or Local)
+*   CUDA-capable GPU (~23GB+ VRAM with CPU offload)
+*   Supabase Account (Project URL & Service Role Key)
 
 ### 1. Clone the Repository
 ```bash
@@ -43,15 +61,25 @@ git clone https://github.com/your-username/mapic.git
 cd mapic
 ```
 
-### 2. Backend Setup
+### 2. GLM-Image Server Setup
+```bash
+cd glm_image_server
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+First run downloads ~35GB model from HuggingFace. Start the server:
+```bash
+python -m glm_image_server.main
+# Wait for "GLM-Image pipeline loaded." before testing
+```
+
+### 3. Backend Setup
 ```bash
 cd backend
 python -m venv venv
-# Windows
-venv\Scripts\activate
-# Linux/Mac
 source venv/bin/activate
-
 pip install -r requirements.txt
 ```
 
@@ -59,18 +87,11 @@ Create a `.env` file in `backend/`:
 ```env
 SUPABASE_URL="your_supabase_url"
 SUPABASE_SERVICE_ROLE_KEY="your_supabase_service_role_key"
-OLLAMA_API_URL="https://your-ollama-host/api/generate"
-MODEL_NAME="x/z-image-turbo:fp8"
-CORS_ORIGINS="http://localhost:5173"
+GLM_IMAGE_API_URL="http://localhost:30000"
+CORS_ORIGINS="http://localhost:5151"
 ```
 
-Run the backend:
-```bash
-# Standard local development
-python -m uvicorn main:app --host 0.0.0.0 --port 8181 --reload
-```
-
-### 3. Frontend Setup
+### 4. Frontend Setup
 ```bash
 cd frontend
 npm install
@@ -82,18 +103,37 @@ VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-Run the frontend:
+### 5. Run Everything
+
 ```bash
-npm run dev
+# From project root
+bash start-app.sh
 ```
+
+Or start services individually:
+```bash
+# Terminal 1: GLM-Image Server
+cd glm_image_server && source .venv/bin/activate && python -m glm_image_server.main
+
+# Terminal 2: Backend
+cd backend && source venv/bin/activate && python -m uvicorn main:app --host 0.0.0.0 --port 8181 --reload
+
+# Terminal 3: Frontend
+cd frontend && npm run dev
+```
+
+- Frontend: http://localhost:5151
+- Backend: http://localhost:8181
+- GLM-Image Server: http://localhost:30000
 
 ## 🖼️ Usage
 
 1.  Login with your Google account.
 2.  Use the **Prompt Input** at the bottom to describe the image you want.
-3.  Click **Generate** or press Enter.
-4.  View your creation in the main canvas.
-5.  Use the **Sidebar** to access previous generations or switch themes.
+3.  Attach reference images (up to 3, max 2MB each) via the paperclip button.
+4.  Click **Generate** or press Enter.
+5.  View your creation in the main canvas.
+6.  Use the **Sidebar** to access previous generations or switch themes.
 
 ## ⚡ Creator
 

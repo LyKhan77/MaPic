@@ -10,7 +10,7 @@ import { useState } from 'react'
 interface ImageCanvasProps {
   currentGeneration: Generation | null
   isLoading: boolean
-  onGenerate: (prompt: string, model: string, images?: string[]) => void
+  onGenerate: (prompt: string, images?: string[]) => void
 }
 
 export default function ImageCanvas({ currentGeneration, isLoading, onGenerate }: ImageCanvasProps) {

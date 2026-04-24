@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 class GenerateRequest(BaseModel):
     prompt: str = Field(..., min_length=1, max_length=2000)
     user_id: UUID
-    model: str | None = None
     images: list[str] | None = None
 
 

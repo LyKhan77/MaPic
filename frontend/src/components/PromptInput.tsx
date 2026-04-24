@@ -1,8 +1,8 @@
 import { useState, type KeyboardEvent, useRef, useEffect } from 'react'
-import { Send, Settings2, Paperclip, X, ChevronDown } from 'lucide-react'
+import { Send, Paperclip, X, ChevronDown } from 'lucide-react'
 
 interface PromptInputProps {
-  onGenerate: (prompt: string, model: string, images?: string[]) => void
+  onGenerate: (prompt: string, images?: string[]) => void
   isLoading: boolean
   isCentralized?: boolean
   onTyping?: (isTyping: boolean) => void
@@ -10,15 +10,8 @@ interface PromptInputProps {
   initialImageUrl?: string
 }
 
-const MODELS = [
-  { id: 'x/flux2-klein:4b', name: 'Flux2 Klein (4B Original)' },
-  { id: 'x/flux2-klein:4b-fp8', name: 'Flux2 Klein (4B fp8)' },
-]
-
 export default function PromptInput({ onGenerate, isLoading, isCentralized, onTyping, initialPrompt, initialImageUrl }: PromptInputProps) {
   const [prompt, setPrompt] = useState('')
-  const [selectedModel, setSelectedModel] = useState(MODELS[0].id)
-  const [showSettings, setShowSettings] = useState(false)
   const [showReferences, setShowReferences] = useState(true)
   const [images, setImages] = useState<{ id: string; base64: string }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -29,7 +22,7 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
     } else {
       setPrompt('')
     }
-    
+
     if (initialImageUrl) {
       const fetchImage = async () => {
         try {
@@ -74,19 +67,19 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
         alert(`File ${file.name} is larger than 2MB.`)
         continue
       }
-      
+
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.readAsDataURL(file)
         reader.onload = () => resolve(reader.result as string)
         reader.onerror = error => reject(error)
       })
-      
+
       newImages.push({ id: Math.random().toString(36).substring(7), base64 })
     }
-    
+
     setImages(newImages)
-    
+
     if (fileInputRef.current) {
         fileInputRef.current.value = ''
     }
@@ -98,12 +91,12 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
 
   const handleSubmit = () => {
     if (!prompt.trim() || isLoading) return
-    
-    const cleanImages = images.length > 0 
-      ? images.map(img => img.base64.includes(',') ? img.base64.split(',')[1] : img.base64) 
+
+    const cleanImages = images.length > 0
+      ? images.map(img => img.base64.includes(',') ? img.base64.split(',')[1] : img.base64)
       : undefined;
-      
-    onGenerate(prompt, selectedModel, cleanImages)
+
+    onGenerate(prompt, cleanImages)
     setPrompt('')
     setImages([])
     if (onTyping) onTyping(false)
@@ -119,52 +112,27 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
   return (
     <div className={`w-full transition-all duration-500 ${isCentralized ? '' : 'border-t border-border bg-card/40 backdrop-blur-md p-6'}`}>
       <div className={`mx-auto w-full relative space-y-2 ${isCentralized ? 'max-w-2xl' : 'max-w-4xl'}`}>
-        
-        {/* Model Selector Toggle */}
+
         {!isCentralized && (
-            <div className="flex items-center justify-between px-1">
-                <button 
-                onClick={() => setShowSettings(!showSettings)}
-                className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors uppercase"
-                >
-                    <Settings2 size={12} />
-                    <span>Model: {MODELS.find(m => m.id === selectedModel)?.name}</span>
-                </button>
+            <div className="flex items-center justify-end px-1">
                 <span className="text-[10px] text-muted-foreground font-mono">ENTER to send</span>
             </div>
         )}
 
-        {showSettings && !isCentralized && (
-          <div className="grid grid-cols-2 gap-2 p-2 bg-card rounded-lg border border-border mb-2 animate-in fade-in slide-in-from-bottom-2 shadow-lg">
-            {MODELS.map(model => (
-              <button
-                key={model.id}
-                onClick={() => {
-                  setSelectedModel(model.id)
-                  setShowSettings(false)
-                }}
-                className={`text-left text-xs p-2 rounded hover:bg-muted font-mono transition-colors ${selectedModel === model.id ? 'bg-primary/20 text-primary border border-primary/50' : 'text-muted-foreground'}`}
-              >
-                {model.name}
-              </button>
-            ))}
-          </div>
-        )}
-
         <div className={`relative flex items-center gap-2 transition-all ${isCentralized ? 'rounded-full bg-[#2a2a2a] p-1.5 shadow-xl ring-1 ring-white/5' : 'rounded-xl bg-muted/20 p-2 ring-1 ring-border focus-within:ring-primary/50'}`}>
-          <input 
-             type="file" 
-             multiple 
-             accept="image/*" 
-             className="hidden" 
+          <input
+             type="file"
+             multiple
+             accept="image/*"
+             className="hidden"
              ref={fileInputRef}
              onChange={handleFileChange}
           />
-          <button 
+          <button
              onClick={() => fileInputRef.current?.click()}
              disabled={isLoading || images.length >= 3}
              className={`flex shrink-0 items-center justify-center transition-all disabled:opacity-50 ${isCentralized ? 'h-10 w-10 rounded-full text-gray-400 hover:text-white hover:bg-white/10' : 'p-2 text-muted-foreground hover:text-foreground'}`}
-             title="Attach image (Max 3, 2MB each)"
+             title="Attach reference image (Max 3, 2MB each)"
           >
              <Paperclip size={isCentralized ? 18 : 20} />
           </button>
@@ -179,7 +147,7 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
             disabled={isLoading}
             className={`flex-1 bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 ${isCentralized ? 'text-lg py-3 px-4' : ''}`}
           />
-          
+
           <button
             onClick={handleSubmit}
             disabled={!prompt.trim() || isLoading}
@@ -207,7 +175,7 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
               </div>
               <ChevronDown size={16} className={`transition-transform duration-200 ${showReferences ? 'rotate-180' : ''}`} />
             </button>
-            
+
             {showReferences && (
               <div className={`p-3 flex gap-3 flex-wrap border-t border-border bg-black/10 ${isCentralized ? 'justify-center' : ''}`}>
                 {images.map(img => (
@@ -224,35 +192,6 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
               </div>
             )}
           </div>
-        )}
-        
-        {isCentralized && (
-            <div className="flex justify-center gap-4 mt-4">
-                <button 
-                    onClick={() => setShowSettings(!showSettings)}
-                    className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground hover:text-primary transition-colors uppercase bg-white/5 px-3 py-1.5 rounded-full border border-white/5"
-                >
-                    <Settings2 size={12} />
-                    <span>Model: {MODELS.find(m => m.id === selectedModel)?.name.split(' (')[0]}</span>
-                </button>
-            </div>
-        )}
-
-        {showSettings && isCentralized && (
-            <div className="grid grid-cols-2 gap-2 p-3 bg-[#1a1a1a] rounded-2xl border border-white/5 mt-4 shadow-2xl animate-in zoom-in-95 duration-200">
-                {MODELS.map(model => (
-                <button
-                    key={model.id}
-                    onClick={() => {
-                    setSelectedModel(model.id)
-                    setShowSettings(false)
-                    }}
-                    className={`text-left text-xs p-3 rounded-xl hover:bg-white/5 font-mono transition-colors ${selectedModel === model.id ? 'bg-primary/10 text-primary border border-primary/30' : 'text-gray-400'}`}
-                >
-                    {model.name}
-                </button>
-                ))}
-            </div>
         )}
       </div>
     </div>

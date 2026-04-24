@@ -29,3 +29,9 @@ temp/
 test_*.py
 *_test.py
 tests/
+
+# GLM-Image server venv + HF cache
+glm_image_server/.venv/
+glm_image_server/venv/
+glm_image_server/__pycache__/
+models/

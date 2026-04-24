@@ -7,13 +7,13 @@ export const api = {
     return res.json()
   },
 
-  async generateImage(prompt: string, userId: string, model: string, images?: string[]) {
+  async generateImage(prompt: string, userId: string, images?: string[]) {
     const res = await fetch(`${API_URL}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, user_id: userId, model, images }),
+      body: JSON.stringify({ prompt, user_id: userId, images }),
     })
-    
+
     if (!res.ok) {
         let errorMessage = 'Failed to generate image';
         try {

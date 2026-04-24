@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 try:
     from backend.config import CORS_ORIGINS
     from backend.schemas import GenerateRequest, Generation
-    from backend.services.ollama_service import OllamaError, generate_image_bytes
+    from backend.services.glm_image_service import GlmImageError, generate_image_bytes
     from backend.services.supabase_service import (
         SupabaseError,
         fetch_history,
@@ -19,7 +19,7 @@ try:
 except ModuleNotFoundError:
     from config import CORS_ORIGINS
     from schemas import GenerateRequest, Generation
-    from services.ollama_service import OllamaError, generate_image_bytes
+    from services.glm_image_service import GlmImageError, generate_image_bytes
     from services.supabase_service import (
         SupabaseError,
         fetch_history,
@@ -45,12 +45,12 @@ app.add_middleware(
 @app.post("/api/generate", response_model=Generation)
 async def generate(payload: GenerateRequest):
     try:
-        image_bytes = await generate_image_bytes(payload.prompt, payload.model, payload.images)
+        image_bytes = await generate_image_bytes(payload.prompt, payload.images)
         image_path, public_url = upload_image(payload.user_id, image_bytes)
         record = insert_generation(payload.user_id, payload.prompt, image_path, public_url)
         return record
-    except OllamaError as exc:
-        logger.exception("Ollama error during generate")
+    except GlmImageError as exc:
+        logger.exception("GLM-Image error during generate")
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except SupabaseError as exc:
         logger.exception("Supabase error during generate")
