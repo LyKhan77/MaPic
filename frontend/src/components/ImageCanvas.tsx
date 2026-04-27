@@ -1,4 +1,4 @@
-import { Download, Share2 } from 'lucide-react'
+import { Download, Copy } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Generation } from '../types'
 import type { ModelStatus } from '../lib/api'
@@ -40,11 +40,27 @@ export default function ImageCanvas({ currentGeneration, isLoading, modelStatus,
 
   const handleShare = async () => {
     if (!currentGeneration?.public_url) return
+    
+    if (!navigator.clipboard || !window.ClipboardItem) {
+      toast.error('Copying images requires a secure context (HTTPS) or a supported browser.')
+      return
+    }
+
     try {
-      await navigator.clipboard.writeText(currentGeneration.public_url)
-      toast.success('Link copied to clipboard!')
-    } catch {
-      toast.error('Failed to copy link')
+      const response = await fetch(currentGeneration.public_url)
+      const blob = await response.blob()
+      
+      // Some browsers (like Safari) might require 'image/png' explicitly
+      // but dynamically using blob.type is generally safer if it's correct.
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          [blob.type]: blob
+        })
+      ])
+      toast.success('Image copied to clipboard!')
+    } catch (error) {
+      console.error('Copy failed:', error)
+      toast.error('Failed to copy image')
     }
   }
 
@@ -100,9 +116,9 @@ export default function ImageCanvas({ currentGeneration, isLoading, modelStatus,
                   <button 
                     onClick={handleShare}
                     className="rounded-full bg-white/10 p-2 hover:bg-secondary hover:text-white transition-colors"
-                    title="Copy Link"
+                    title="Copy Image"
                   >
-                    <Share2 size={16} />
+                    <Copy size={16} />
                   </button>
                 </div>
               </div>
