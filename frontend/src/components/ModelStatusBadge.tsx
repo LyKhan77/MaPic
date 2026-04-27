@@ -1,0 +1,49 @@
+import { motion, AnimatePresence } from 'framer-motion'
+import type { ModelStatus } from '../lib/api'
+
+interface ModelStatusBadgeProps {
+  status: ModelStatus
+}
+
+const statusConfig: Record<ModelStatus, { label: string; color: string; pulse: boolean }> = {
+  ready: { label: 'READY', color: 'bg-emerald-400 shadow-emerald-400/50', pulse: false },
+  loading: { label: 'LOADING', color: 'bg-amber-400 shadow-amber-400/50', pulse: true },
+  offline: { label: 'OFFLINE', color: 'bg-red-400 shadow-red-400/50', pulse: true },
+}
+
+export default function ModelStatusBadge({ status }: ModelStatusBadgeProps) {
+  const config = statusConfig[status]
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 ring-1 ring-white/10">
+      <span className="relative flex h-2 w-2">
+        {config.pulse && (
+          <span className={`absolute inset-0 rounded-full ${config.color} opacity-75 animate-ping`} />
+        )}
+        <motion.span
+          layout
+          className={`relative inline-flex h-2 w-2 rounded-full ${config.color} shadow-[0_0_6px]`}
+        />
+      </span>
+      <span className="text-[10px] font-mono tracking-widest text-muted-foreground uppercase">
+        Model
+      </span>
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={status}
+          initial={{ y: -6, opacity: 0, filter: 'blur(4px)' }}
+          animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
+          exit={{ y: 6, opacity: 0, filter: 'blur(4px)' }}
+          transition={{ duration: 0.2 }}
+          className={`text-[10px] font-mono tracking-widest font-bold ${
+            status === 'ready' ? 'text-emerald-400'
+              : status === 'loading' ? 'text-amber-400'
+              : 'text-red-400'
+          }`}
+        >
+          {config.label}
+        </motion.span>
+      </AnimatePresence>
+    </div>
+  )
+}

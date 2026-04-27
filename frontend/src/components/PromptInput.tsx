@@ -1,5 +1,6 @@
 import { useState, type KeyboardEvent, useRef, useEffect } from 'react'
 import { Send, Paperclip, X, ChevronDown } from 'lucide-react'
+import type { ModelStatus } from '../lib/api'
 
 interface PromptInputProps {
   onGenerate: (prompt: string, images?: string[]) => void
@@ -8,13 +9,16 @@ interface PromptInputProps {
   onTyping?: (isTyping: boolean) => void
   initialPrompt?: string
   initialImageUrl?: string
+  modelStatus?: ModelStatus
 }
 
-export default function PromptInput({ onGenerate, isLoading, isCentralized, onTyping, initialPrompt, initialImageUrl }: PromptInputProps) {
+export default function PromptInput({ onGenerate, isLoading, isCentralized, onTyping, initialPrompt, initialImageUrl, modelStatus }: PromptInputProps) {
   const [prompt, setPrompt] = useState('')
   const [showReferences, setShowReferences] = useState(true)
   const [images, setImages] = useState<{ id: string; base64: string }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const isModelReady = modelStatus === 'ready' || modelStatus === undefined
 
   useEffect(() => {
     if (initialPrompt) {
@@ -48,7 +52,7 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
   const handleChange = (val: string) => {
     setPrompt(val)
     if (onTyping) {
-        onTyping(val.length > 0)
+      onTyping(val.length > 0)
     }
   }
 
@@ -77,11 +81,10 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
 
       newImages.push({ id: Math.random().toString(36).substring(7), base64 })
     }
-
     setImages(newImages)
 
     if (fileInputRef.current) {
-        fileInputRef.current.value = ''
+      fileInputRef.current.value = ''
     }
   }
 
@@ -90,7 +93,7 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
   }
 
   const handleSubmit = () => {
-    if (!prompt.trim() || isLoading) return
+    if (!prompt.trim() || isLoading || !isModelReady) return
 
     const cleanImages = images.length > 0
       ? images.map(img => img.base64.includes(',') ? img.base64.split(',')[1] : img.base64)
@@ -113,6 +116,19 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
     <div className={`w-full transition-all duration-500 ${isCentralized ? '' : 'border-t border-border bg-card/40 backdrop-blur-md p-6'}`}>
       <div className={`mx-auto w-full relative space-y-2 ${isCentralized ? 'max-w-2xl' : 'max-w-4xl'}`}>
 
+        {!isCentralized && !isModelReady && (
+          <div className="absolute -top-8 left-1/2 right-1/2 flex items-center justify-center bg-destructive/90 backdrop-blur-sm py-1 px-3 rounded-lg z-50">
+            <span className="text-xs font-mono text-destructive-foreground">
+              {!isModelReady && (
+                <>
+                  {modelStatus === 'loading' && 'Model loading...'}
+                  {modelStatus === 'offline' && 'Reconnecting...'}
+                </>
+              )}
+            </span>
+          </div>
+        )}
+
         {!isCentralized && (
             <div className="flex items-center justify-end px-1">
                 <span className="text-[10px] text-muted-foreground font-mono">ENTER to send</span>
@@ -130,7 +146,7 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
           />
           <button
              onClick={() => fileInputRef.current?.click()}
-             disabled={isLoading || images.length >= 3}
+             disabled={isLoading || images.length >= 3 || !isModelReady}
              className={`flex shrink-0 items-center justify-center transition-all disabled:opacity-50 ${isCentralized ? 'h-10 w-10 rounded-full text-gray-400 hover:text-white hover:bg-white/10' : 'p-2 text-muted-foreground hover:text-foreground'}`}
              title="Attach reference image (Max 3, 2MB each)"
           >
@@ -144,13 +160,13 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
             onKeyDown={handleKeyDown}
             onBlur={() => onTyping && onTyping(false)}
             placeholder={isCentralized ? "How can MaPic help you today?" : `Describe your imagination...`}
-            disabled={isLoading}
+            disabled={isLoading || !isModelReady}
             className={`flex-1 bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 ${isCentralized ? 'text-lg py-3 px-4' : ''}`}
           />
 
           <button
             onClick={handleSubmit}
-            disabled={!prompt.trim() || isLoading}
+            disabled={!prompt.trim() || isLoading || !isModelReady}
             className={`group shrink-0 flex items-center justify-center transition-all ${isCentralized ? 'h-10 w-10 rounded-full bg-white text-black hover:bg-primary disabled:bg-gray-600' : 'rounded-lg bg-foreground px-4 py-2 text-sm font-bold text-background hover:bg-primary hover:text-primary-foreground'}`}
           >
             {isCentralized ? <Send size={18} /> : (

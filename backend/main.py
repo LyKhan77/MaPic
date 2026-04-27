@@ -2,11 +2,12 @@ from uuid import UUID
 
 import logging
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
-    from backend.config import CORS_ORIGINS
+    from backend.config import CORS_ORIGINS, GLM_IMAGE_API_URL
     from backend.schemas import GenerateRequest, Generation
     from backend.services.glm_image_service import GlmImageError, generate_image_bytes
     from backend.services.supabase_service import (
@@ -17,7 +18,7 @@ try:
         delete_generation,
     )
 except ModuleNotFoundError:
-    from config import CORS_ORIGINS
+    from config import CORS_ORIGINS, GLM_IMAGE_API_URL
     from schemas import GenerateRequest, Generation
     from services.glm_image_service import GlmImageError, generate_image_bytes
     from services.supabase_service import (
@@ -40,6 +41,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/api/health")
+async def health():
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{GLM_IMAGE_API_URL.rstrip('/')}/health")
+            return resp.json()
+    except Exception:
+        return {"status": "offline"}
 
 
 @app.post("/api/generate", response_model=Generation)

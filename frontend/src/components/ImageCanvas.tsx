@@ -1,6 +1,7 @@
 import { Download, Share2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { Generation } from '../types'
+import type { ModelStatus } from '../lib/api'
 import Loader from './Loader'
 import BearAnimation from './BearAnimation'
 import { toast } from 'sonner'
@@ -10,10 +11,11 @@ import { useState } from 'react'
 interface ImageCanvasProps {
   currentGeneration: Generation | null
   isLoading: boolean
+  modelStatus: ModelStatus
   onGenerate: (prompt: string, images?: string[]) => void
 }
 
-export default function ImageCanvas({ currentGeneration, isLoading, onGenerate }: ImageCanvasProps) {
+export default function ImageCanvas({ currentGeneration, isLoading, modelStatus, onGenerate }: ImageCanvasProps) {
   const [isTyping, setIsTyping] = useState(false)
 
   const handleDownload = async () => {
@@ -66,7 +68,7 @@ export default function ImageCanvas({ currentGeneration, isLoading, onGenerate }
                 <Loader />
               </div>
               <p className="font-mono text-sm text-primary animate-pulse mt-8">
-                NEURAL NETWORKS ACTIVATING...
+                {modelStatus === 'loading' ? 'Loading pipeline...' : modelStatus === 'offline' ? 'Reconnecting...' : 'Neural networks activating...'}
               </p>
             </motion.div>
           ) : currentGeneration ? (
@@ -123,11 +125,12 @@ export default function ImageCanvas({ currentGeneration, isLoading, onGenerate }
                  />
                </div>
                
-               <PromptInput 
-                  onGenerate={onGenerate} 
-                  isLoading={isLoading} 
-                  isCentralized={true} 
+               <PromptInput
+                  onGenerate={onGenerate}
+                  isLoading={isLoading}
+                  isCentralized={true}
                   onTyping={setIsTyping}
+                  modelStatus={modelStatus}
                />
             </motion.div>
           )}

@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from '../lib/api'
+import { api, type ModelStatus } from '../lib/api'
 import Sidebar from '../components/Sidebar'
 import ImageCanvas from '../components/ImageCanvas'
 import PromptInput from '../components/PromptInput'
+import ModelStatusBadge from '../components/ModelStatusBadge'
 import type { Generation } from '../types'
 import { Toaster, toast } from 'sonner'
 
@@ -15,6 +16,17 @@ interface DashboardProps {
 export default function Dashboard({ session }: DashboardProps) {
   const queryClient = useQueryClient()
   const [currentGen, setCurrentGen] = useState<Generation | null>(null)
+
+  // Poll model health status
+  const { data: modelStatus = 'offline' } = useQuery({
+    queryKey: ['model-health'],
+    queryFn: api.getHealth,
+    refetchInterval: (query) => {
+      if (query.state.data === 'ready') return false
+      return 5000
+    },
+    refetchIntervalInBackground: false,
+  })
 
   // Fetch History
   const { data: history = [] } = useQuery({
@@ -79,9 +91,13 @@ export default function Dashboard({ session }: DashboardProps) {
 
       <main className="flex flex-1 flex-col relative min-w-0 min-h-0">
         <div className="flex-1 relative min-h-0 flex flex-col">
+           <div className="absolute top-4 right-6 z-50">
+             <ModelStatusBadge status={modelStatus} />
+           </div>
            <ImageCanvas
              currentGeneration={currentGen}
              isLoading={generateMutation.isPending}
+             modelStatus={modelStatus}
              onGenerate={(prompt, images) => generateMutation.mutate({ prompt, images })}
            />
         </div>
@@ -94,6 +110,7 @@ export default function Dashboard({ session }: DashboardProps) {
               isCentralized={false}
               initialPrompt={currentGen.prompt}
               initialImageUrl={currentGen.public_url}
+              modelStatus={modelStatus}
             />
           </div>
         )}

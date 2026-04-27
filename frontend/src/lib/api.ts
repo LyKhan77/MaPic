@@ -1,6 +1,19 @@
 const API_URL = `http://${window.location.hostname}:8181/api`
 
+export type ModelStatus = 'ready' | 'loading' | 'offline'
+
 export const api = {
+  async getHealth(): Promise<ModelStatus> {
+    try {
+      const res = await fetch(`${API_URL}/health`)
+      if (!res.ok) return 'offline'
+      const data = await res.json()
+      return data.status === 'ready' ? 'ready' : 'loading'
+    } catch {
+      return 'offline'
+    }
+  },
+
   async getHistory(userId: string) {
     const res = await fetch(`${API_URL}/history/${userId}`)
     if (!res.ok) throw new Error('Failed to fetch history')

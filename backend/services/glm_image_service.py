@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import logging
 
@@ -10,7 +11,9 @@ except ModuleNotFoundError:
 
 logger = logging.getLogger("mapic.glm_image")
 
-TIMEOUT_SECONDS = 900  # GLM-Image is slow with CPU offload (~10-15 min)
+TIMEOUT_SECONDS = 14400  # GLM-Image is slow with CPU offload (~10-15 min)
+MAX_RETRIES = 6
+RETRY_DELAY = 10  # seconds between retries
 
 
 class GlmImageError(Exception):
@@ -27,16 +30,24 @@ async def generate_image_bytes(prompt: str, images: list[str] | None = None) -> 
         endpoint = f"{url}/v1/images/generations"
         payload = {"prompt": prompt}
 
-    try:
-        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-            resp = await client.post(endpoint, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            b64 = data["data"][0]["b64_json"]
-            return base64.b64decode(b64)
-    except httpx.HTTPStatusError as exc:
-        logger.exception("GLM-Image server returned %s", exc.response.status_code)
-        raise GlmImageError(f"GLM-Image error: {exc.response.text}") from exc
-    except Exception as exc:
-        logger.exception("GLM-Image request failed")
-        raise GlmImageError(str(exc)) from exc
+    last_exc = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+                resp = await client.post(endpoint, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                b64 = data["data"][0]["b64_json"]
+                return base64.b64decode(b64)
+        except httpx.ConnectError as exc:
+            last_exc = exc
+            logger.warning("GLM-Image server not ready, retry %d/%d in %ds", attempt + 1, MAX_RETRIES, RETRY_DELAY)
+            await asyncio.sleep(RETRY_DELAY)
+        except httpx.HTTPStatusError as exc:
+            logger.exception("GLM-Image server returned %s", exc.response.status_code)
+            raise GlmImageError(f"GLM-Image error: {exc.response.text}") from exc
+        except Exception as exc:
+            logger.exception("GLM-Image request failed")
+            raise GlmImageError(str(exc)) from exc
+
+    raise GlmImageError(f"GLM-Image server unavailable after {MAX_RETRIES} retries: {last_exc}") from last_exc
