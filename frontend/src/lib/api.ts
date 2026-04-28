@@ -1,6 +1,6 @@
 const API_URL = `http://${window.location.hostname}:8181/api`
 
-export type ModelStatus = 'ready' | 'loading' | 'offline'
+export type ModelStatus = 'ready' | 'loading' | 'offline' | 'unloaded'
 
 export const api = {
   async getHealth(): Promise<ModelStatus> {
@@ -8,10 +8,22 @@ export const api = {
       const res = await fetch(`${API_URL}/health`)
       if (!res.ok) return 'offline'
       const data = await res.json()
-      return data.status === 'ready' ? 'ready' : 'loading'
+      return data.status as ModelStatus
     } catch {
       return 'offline'
     }
+  },
+
+  async loadModel() {
+    const res = await fetch(`${API_URL}/load`, { method: 'POST' })
+    if (!res.ok) throw new Error('Failed to load model')
+    return res.json()
+  },
+
+  async unloadModel() {
+    const res = await fetch(`${API_URL}/unload`, { method: 'POST' })
+    if (!res.ok) throw new Error('Failed to unload model')
+    return res.json()
   },
 
   async getHistory(userId: string) {

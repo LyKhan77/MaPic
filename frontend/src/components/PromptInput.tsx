@@ -19,6 +19,7 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isModelReady = modelStatus === 'ready' || modelStatus === undefined
+  const isModelUnloaded = modelStatus === 'unloaded'
 
   useEffect(() => {
     if (initialPrompt) {
@@ -116,15 +117,12 @@ export default function PromptInput({ onGenerate, isLoading, isCentralized, onTy
     <div className={`w-full transition-all duration-500 ${isCentralized ? '' : 'border-t border-border bg-card/40 backdrop-blur-md p-6'}`}>
       <div className={`mx-auto w-full relative space-y-2 ${isCentralized ? 'max-w-2xl' : 'max-w-4xl'}`}>
 
-        {!isCentralized && !isModelReady && (
-          <div className="absolute -top-8 left-1/2 right-1/2 flex items-center justify-center bg-destructive/90 backdrop-blur-sm py-1 px-3 rounded-lg z-50">
+        {!isCentralized && (!isModelReady || isModelUnloaded) && (
+          <div className="absolute -top-8 left-1/2 right-1/2 flex items-center justify-center bg-destructive/90 backdrop-blur-sm py-1 px-3 rounded-lg z-50 whitespace-nowrap w-fit -translate-x-1/2">
             <span className="text-xs font-mono text-destructive-foreground">
-              {!isModelReady && (
-                <>
-                  {modelStatus === 'loading' && 'Model loading...'}
-                  {modelStatus === 'offline' && 'Reconnecting...'}
-                </>
-              )}
+              {modelStatus === 'loading' && 'Model loading...'}
+              {modelStatus === 'offline' && 'Reconnecting...'}
+              {modelStatus === 'unloaded' && 'Model is sleeping. Click Load to wake it up.'}
             </span>
           </div>
         )}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type ModelStatus } from '../lib/api'
+import { api } from '../lib/api'
 import Sidebar from '../components/Sidebar'
 import ImageCanvas from '../components/ImageCanvas'
 import PromptInput from '../components/PromptInput'
@@ -76,6 +76,27 @@ export default function Dashboard({ session }: DashboardProps) {
     setCurrentGen(null)
   }
 
+  const handleLoadModel = async () => {
+    try {
+      queryClient.setQueryData(['model-health'], 'loading')
+      await api.loadModel()
+      queryClient.invalidateQueries({ queryKey: ['model-health'] })
+    } catch (e) {
+      console.error(e)
+      queryClient.setQueryData(['model-health'], 'offline')
+    }
+  }
+
+  const handleUnloadModel = async () => {
+    try {
+      queryClient.setQueryData(['model-health'], 'unloaded')
+      await api.unloadModel()
+      queryClient.invalidateQueries({ queryKey: ['model-health'] })
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground font-sans">
       <Toaster position="top-right" theme="dark" />
@@ -92,7 +113,7 @@ export default function Dashboard({ session }: DashboardProps) {
       <main className="flex flex-1 flex-col relative min-w-0 min-h-0">
         <div className="flex-1 relative min-h-0 flex flex-col">
            <div className="absolute top-4 right-6 z-50">
-             <ModelStatusBadge status={modelStatus} />
+             <ModelStatusBadge status={modelStatus} onLoad={handleLoadModel} onUnload={handleUnloadModel} />
            </div>
            <ImageCanvas
              currentGeneration={currentGen}

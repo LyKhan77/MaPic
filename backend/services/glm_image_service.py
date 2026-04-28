@@ -20,6 +20,32 @@ class GlmImageError(Exception):
     pass
 
 
+async def get_health_status() -> str:
+    url = GLM_IMAGE_API_URL.rstrip("/")
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get(f"{url}/health")
+            resp.raise_for_status()
+            return resp.json().get("status", "offline")
+    except Exception as exc:
+        logger.warning(f"Health check failed: {exc}")
+        return "offline"
+
+async def load_model() -> dict:
+    url = GLM_IMAGE_API_URL.rstrip("/")
+    async with httpx.AsyncClient(timeout=300) as client: # Timeout panjang untuk loading
+        resp = await client.post(f"{url}/v1/system/load")
+        resp.raise_for_status()
+        return resp.json()
+
+async def unload_model() -> dict:
+    url = GLM_IMAGE_API_URL.rstrip("/")
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(f"{url}/v1/system/unload")
+        resp.raise_for_status()
+        return resp.json()
+
+
 async def generate_image_bytes(prompt: str, images: list[str] | None = None) -> bytes:
     url = GLM_IMAGE_API_URL.rstrip("/")
 
@@ -31,6 +57,13 @@ async def generate_image_bytes(prompt: str, images: list[str] | None = None) -> 
         payload = {"prompt": prompt}
 
     last_exc = None
+
+    # Auto-load if unloaded
+    current_status = await get_health_status()
+    if current_status == "unloaded":
+        logger.info("Model is unloaded. Auto-loading before generation...")
+        await load_model()
+
     for attempt in range(MAX_RETRIES):
         try:
             async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:

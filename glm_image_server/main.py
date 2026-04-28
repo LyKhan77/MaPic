@@ -1,10 +1,16 @@
 import asyncio
 import base64
+import gc
 import io
 import logging
 import math
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+
+last_request_time = time.time()
+is_unloaded = False
+is_loading = False
 
 import torch
 from diffusers import PipelineQuantizationConfig
@@ -76,85 +82,119 @@ def _log_gpu_memory(label: str = ""):
 
 
 def load_model():
-    global pipe
+    global pipe, is_loading
     if pipe is None:
+        is_loading = True
         logger.info("Loading GLM-Image pipeline across GPUs...")
         _log_gpu_memory("before_load")
 
-        # 8-bit quantization to halve model weight memory (~32 GB -> ~16 GB)
-        quantization_config = None
         try:
-            quantization_config = PipelineQuantizationConfig(
-                quant_backend="bitsandbytes_8bit",
-                quant_kwargs={"load_in_8bit": True},
-                components_to_quantize=["transformer", "vision_language_encoder"],
-            )
-            logger.info("8-bit quantization config created.")
-        except Exception as exc:
-            logger.warning("Failed to create quantization config: %s", exc)
+            # 8-bit quantization to halve model weight memory (~32 GB -> ~16 GB)
+            quantization_config = None
+            try:
+                quantization_config = PipelineQuantizationConfig(
+                    quant_backend="bitsandbytes_8bit",
+                    quant_kwargs={"load_in_8bit": True},
+                    components_to_quantize=["transformer", "vision_language_encoder"],
+                )
+                logger.info("8-bit quantization config created.")
+            except Exception as exc:
+                logger.warning("Failed to create quantization config: %s", exc)
 
-        try:
-            pipe = GlmImagePipeline.from_pretrained(
-                "zai-org/GLM-Image",
-                torch_dtype=torch.bfloat16,
-                device_map="balanced",
-                max_memory=MAX_MEMORY,
-                quantization_config=quantization_config,
-            )
-            _patch_vae_device()
-            logger.info("GLM-Image pipeline loaded with 8-bit quantization.")
-        except Exception as exc:
-            logger.warning("Quantized load failed (%s). Falling back to standard load...", exc)
-            pipe = GlmImagePipeline.from_pretrained(
-                "zai-org/GLM-Image",
-                torch_dtype=torch.bfloat16,
-                device_map="balanced",
-                max_memory=MAX_MEMORY,
-            )
-            _patch_vae_device()
-            logger.info("GLM-Image pipeline loaded (standard, no quantization).")
+            try:
+                pipe = GlmImagePipeline.from_pretrained(
+                    "zai-org/GLM-Image",
+                    torch_dtype=torch.bfloat16,
+                    device_map="balanced",
+                    max_memory=MAX_MEMORY,
+                    quantization_config=quantization_config,
+                )
+                _patch_vae_device()
+                logger.info("GLM-Image pipeline loaded with 8-bit quantization.")
+            except Exception as exc:
+                logger.warning("Quantized load failed (%s). Falling back to standard load...", exc)
+                pipe = GlmImagePipeline.from_pretrained(
+                    "zai-org/GLM-Image",
+                    torch_dtype=torch.bfloat16,
+                    device_map="balanced",
+                    max_memory=MAX_MEMORY,
+                )
+                _patch_vae_device()
+                logger.info("GLM-Image pipeline loaded (standard, no quantization).")
 
-        # Offload VAE to CPU to free GPU VRAM for transformer activations
-        logger.info("Offloading VAE to CPU...")
-        pipe.vae = pipe.vae.to("cpu")
+            # Offload VAE to CPU to free GPU VRAM for transformer activations
+            logger.info("Offloading VAE to CPU...")
+            pipe.vae = pipe.vae.to("cpu")
 
-        # Enable VAE slicing & tiling to reduce peak memory during encode/decode
-        try:
-            pipe.vae.enable_slicing()
-            logger.info("VAE slicing enabled.")
-        except Exception as exc:
-            logger.warning("VAE slicing not available: %s", exc)
+            # Enable VAE slicing & tiling to reduce peak memory during encode/decode
+            try:
+                pipe.vae.enable_slicing()
+                logger.info("VAE slicing enabled.")
+            except Exception as exc:
+                logger.warning("VAE slicing not available: %s", exc)
 
-        try:
-            pipe.vae.enable_tiling()
-            logger.info("VAE tiling enabled.")
-        except Exception as exc:
-            logger.warning("VAE tiling not available: %s", exc)
+            try:
+                pipe.vae.enable_tiling()
+                logger.info("VAE tiling enabled.")
+            except Exception as exc:
+                logger.warning("VAE tiling not available: %s", exc)
 
-        # Enable attention slicing on transformer to reduce activation memory
-        try:
-            if hasattr(pipe, "transformer") and hasattr(pipe.transformer, "enable_attention_slicing"):
-                pipe.transformer.enable_attention_slicing("auto")
-                logger.info("Transformer attention slicing enabled.")
-            elif hasattr(pipe, "enable_attention_slicing"):
-                pipe.enable_attention_slicing("auto")
-                logger.info("Pipeline attention slicing enabled.")
-        except Exception as exc:
-            logger.warning("Attention slicing not available: %s", exc)
+            # Enable attention slicing on transformer to reduce activation memory
+            try:
+                if hasattr(pipe, "transformer") and hasattr(pipe.transformer, "enable_attention_slicing"):
+                    pipe.transformer.enable_attention_slicing("auto")
+                    logger.info("Transformer attention slicing enabled.")
+                elif hasattr(pipe, "enable_attention_slicing"):
+                    pipe.enable_attention_slicing("auto")
+                    logger.info("Pipeline attention slicing enabled.")
+            except Exception as exc:
+                logger.warning("Attention slicing not available: %s", exc)
 
-        # Enable Flash SDP for memory-efficient attention (PyTorch 2.0+)
-        if hasattr(torch.backends.cuda, "enable_flash_sdp"):
-            torch.backends.cuda.enable_flash_sdp(True)
-            logger.info("Flash SDP enabled.")
+            # Enable Flash SDP for memory-efficient attention (PyTorch 2.0+)
+            if hasattr(torch.backends.cuda, "enable_flash_sdp"):
+                torch.backends.cuda.enable_flash_sdp(True)
+                logger.info("Flash SDP enabled.")
 
-        _log_gpu_memory("after_load")
-        logger.info("GLM-Image pipeline ready (multi-GPU, VAE on CPU).")
+            global is_unloaded
+            is_unloaded = False
+            _log_gpu_memory("after_load")
+            logger.info("GLM-Image pipeline ready (multi-GPU, VAE on CPU).")
+        finally:
+            is_loading = False
+
+
+def unload_model():
+    global pipe, is_unloaded
+    if pipe is not None:
+        logger.info("Unloading model to free VRAM...")
+        pipe = None
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        is_unloaded = True
+        logger.info("Model unloaded. VRAM freed.")
+
+
+async def idle_monitor():
+    global last_request_time, is_unloaded
+    idle_timeout = 3600  # 1 jam
+    while True:
+        await asyncio.sleep(60)  # Cek setiap 1 menit
+        if not is_unloaded and pipe is not None:
+            if time.time() - last_request_time > idle_timeout:
+                logger.info(f"Model idle for > {idle_timeout}s. Auto-unloading...")
+                unload_model()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    load_model()
+    global is_loading
+    is_loading = True
+    # Start loading in background thread so the server can respond to health checks
+    _run_inference(load_model)
+    task = asyncio.create_task(idle_monitor())
     yield
+    task.cancel()
 
 
 app = FastAPI(title="GLM-Image Server", lifespan=lifespan)
@@ -187,14 +227,37 @@ def _run_inference(fn):
 
 @app.get("/health")
 async def health():
+    if is_loading:
+        return {"status": "loading"}
+    if is_unloaded:
+        return {"status": "unloaded"}
     if pipe is not None:
         return {"status": "ready"}
     return {"status": "loading"}
 
 
+@app.post("/v1/system/load")
+async def api_load_model():
+    global is_unloaded, last_request_time
+    if is_unloaded or pipe is None:
+        # Run blocking load in executor to keep event loop free
+        await _run_inference(load_model)
+        last_request_time = time.time()
+    return {"status": "ready"}
+
+
+@app.post("/v1/system/unload")
+async def api_unload_model():
+    if not is_unloaded:
+        unload_model()
+    return {"status": "unloaded"}
+
+
 @app.post("/v1/images/generations")
 async def text_to_image(req: T2IRequest):
     async with _inference_lock:
+        global last_request_time
+        last_request_time = time.time()
         if pipe is None:
             return {"error": "Model failed to load"}
 
@@ -217,6 +280,8 @@ async def text_to_image(req: T2IRequest):
 @app.post("/v1/images/edits")
 async def image_to_image(req: I2IRequest):
     async with _inference_lock:
+        global last_request_time
+        last_request_time = time.time()
         if pipe is None:
             return {"error": "Model failed to load"}
 
