@@ -20,6 +20,8 @@ tmp/
 temp/
 *.tmp
 *test/
+mapic-glm.service
+start-mapic-glm.sh
 # Documentation (keep only README.md)
 *.md
 !README.md
